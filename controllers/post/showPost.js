@@ -1,7 +1,7 @@
 const User = require('../../models/User')
 const Post = require('../../models/Post') // Ensure Post model is imported
 
-// Optimized controller to fetch posts for the user
+// Optimized controller to fetch
 const showPost = async (req, res) => {
   const { id } = req.body
 
