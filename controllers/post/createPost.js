@@ -1,24 +1,38 @@
 // Create a post
 const Post = require('../../models/Post')
+const User = require('../../models/User')
 
 const createPost = async (req, res) => {
+  const { id } = req.params
+  if (!id) {
+    return res.status(400).json({ message: 'User Id is Required' })
+  }
   try {
-    const { caption } = req.body;
+    const { category, image, caption } = req.body
 
-    if (!caption) {
+    if (!caption || !category) {
       return res.status(400).json({
         success: false,
-        message: "Missing Required Fields.",
-      });
+        message: 'Missing Required Fields.',
+      })
+    }
+
+    const user = await User.findById(id)
+    if (!user) {
+      return res.status(404).json({ message: 'User Not Found' })
     }
 
     const newPost = new Post({
-      image: req.file?.filename || null,
+      image: image || null,
       caption: caption,
-      author: req.user.userId, // Assign the post to the authenticated user
-    });
+      category: category,
+      author: user._id, // Assign the post to the authenticated user
+    })
+
+    user.posts.push(newPost._id)
 
     const savedPost = await newPost.save()
+    await user.save()
 
     res.status(201).json({
       success: true,

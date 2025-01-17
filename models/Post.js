@@ -22,10 +22,10 @@ const PostSchema = new mongoose.Schema(
         ref: 'Comment', // Reference the Comment Schema
       },
     ],
-    // category: {
-    //   type: String,
-    //   required: true,
-    // },
+    category: {
+      type: String,
+      required: true,
+    },
     author: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
