@@ -1,6 +1,27 @@
-// Create a post
 const Post = require('../../models/Post')
 const User = require('../../models/User')
+
+/**
+ * @Params:
+ *  - req: The request object, which should include:
+ *      - params.id: The ID of the user creating the post.
+ *      - body: The request body containing:
+ *          - category (string): The category of the post (required).
+ *          - image (string, optional): The URL of the image for the post.
+ *          - caption (string): The caption for the post (required).
+ *  - res: The response object used to send back the appropriate HTTP response.
+ *
+ * @Returns:
+ *  - If successful:
+ *      - Status 201: JSON object containing:
+ *          - success (boolean): Indicates the operation was successful.
+ *          - message (string): A success message.
+ *          - data (object): The created post object.
+ *  - If failed:
+ *      - Status 400: JSON object indicating a bad request due to missing fields or parameters.
+ *      - Status 404: JSON object indicating the user was not found.
+ *      - Status 500: JSON object indicating an internal server error.
+ */
 
 const createPost = async (req, res) => {
   const { id } = req.params
