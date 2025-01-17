@@ -23,7 +23,7 @@ const PostSchema = new mongoose.Schema(
       },
     ],
     category: {
-      type: String,
+      type: Array,
       required: true,
     },
     author: {

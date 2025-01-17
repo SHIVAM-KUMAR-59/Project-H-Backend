@@ -2,15 +2,23 @@ const express = require('express')
 const postRouter = express.Router()
 const verifyToken = require('../middleware/auth/verifyToken.js')
 const checkObjectID = require('../middleware/main/checkObjectID')
-const upload = require('../utils/main/imageUploading');
+const upload = require('../utils/main/imageUploading')
 
 // Unprotected routes
 postRouter.get('/all', require('../controllers/post/getAllPost.js')) // Get all posts
-postRouter.get('/:id', checkObjectID, require('../controllers/post/getPostById.js')) // Get a specific post
+postRouter.get(
+  '/:id',
+  checkObjectID,
+  require('../controllers/post/getPostById.js'),
+) // Get a specific post
 
+postRouter.post(
+  '/create/:id',
+  upload.single('image'),
+  require('../controllers/post/createPost.js'),
+) // Create a new post
 // Protected routes
 postRouter.use(verifyToken)
-postRouter.post('/create', upload.single('image'), require('../controllers/post/createPost.js')) // Create a new post
 
 // Checking ID in query paramaters
 postRouter.use(checkObjectID)
