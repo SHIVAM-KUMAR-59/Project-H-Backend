@@ -4,13 +4,17 @@ const Post = require('../../models/Post');
 const updatePost = async (req, res) => {
     try {
         const { id } = req.params;
-        const { title, content } = req.body;
+        const { image, caption } = req.body;
 
         if (!id) {
             return res.status(400).json({
                 success: false,
                 message: "Post ID is required.",
             });
+        }
+        
+        if(!image || !caption){
+           return res.status(400).json({success: false, message: "Missing required fields"});
         }
 
         const post = await Post.findById(id);
@@ -30,8 +34,8 @@ const updatePost = async (req, res) => {
             });
         }
 
-        post.title = title || post.title;
-        post.content = content || post.content;
+        post.caption = caption || post.caption;
+        post.image = image || post.image;
 
         const updatedPost = await post.save();
 

@@ -3,18 +3,18 @@ const Post = require('../../models/Post');
 
 const createPost = async (req, res) => {
     try {
-        const { title, content } = req.body;
+        const { image, caption } = req.body;
 
-        if (!title || !content) {
+        if (caption) {
             return res.status(400).json({
                 success: false,
-                message: "Title and content are required.",
+                message: "Missing Required Fields.",
             });
         }
 
         const newPost = new Post({
-            title,
-            content,
+            image,
+            caption,
             user: req.user.userId, // Assign the post to the authenticated user
         });
 
