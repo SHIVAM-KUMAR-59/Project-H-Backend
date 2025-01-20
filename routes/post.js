@@ -1,23 +1,27 @@
-// All the post routes
-const express = require('express')
-const router = express.Router()
+const express = require('express');
+const postRouter = express.Router();
+const { requireAuth } = require('@clerk/clerk-sdk-node');
+const checkObjectID = require('../middleware/main/checkObjectID');
+const upload = require('../utils/main/imageUploading');
 
-// Import controllers
-// const createPost = require('../controllers/createPost')
-const getAllPosts = require('../controllers/post/getAllPost.js')
-const getPostById = require('../controllers/post/getPostById.js')
-// const updatePost = require('../controllers/updatePost')
-// const deletePost = require('../controllers/deletePost')
-// const likePost = require('../controllers/likePost')
-// const savePost = require('../controllers/savePost')
+// Unprotected routes
+postRouter.get('/all', require('../controllers/post/getAllPost')); // Get all posts
+postRouter.get('/:id', checkObjectID, require('../controllers/post/getPostById')); // Get a specific post
 
-// Routes for posts
-// router.post('/create', createPost) // Create a new post
-router.get('/all', getAllPosts) // Get all posts
-router.get('/:id', getPostById) // Get a specific post
-// router.put('/update/:id', updatePost) // Update a post
-// router.delete('/delete/:id', deletePost) // Delete a post
-// router.post('/like/:id', likePost) // Like or unlike a post
-// router.post('/save/:id', savePost) // Save a post
+postRouter.use(requireAuth); // Protect all subsequent routes
 
-module.exports = router
+postRouter.post(
+  '/create',
+  upload.single('image'),
+  require('../controllers/post/createPost'),
+); // Create a new post
+
+// Checking ID in query parameters
+postRouter.patch('/update/:id', checkObjectID, require('../controllers/post/updatePost')); // Update a post
+postRouter.delete('/delete/:id', checkObjectID, require('../controllers/post/deletePost')); // Delete a post
+postRouter.post('/like/:id', checkObjectID, require('../controllers/post/likeOrUnlikePost')); // Like or unlike a post
+postRouter.post('/save/:id', checkObjectID, require('../controllers/post/savePost')); // Save a post
+postRouter.get('/comments/:id', checkObjectID, require('../controllers/post/getAllComment')); // Get all comments for a post
+postRouter.post('/comment/:id', checkObjectID, require('../controllers/post/addComment')); // Add a comment to a post
+
+module.exports = postRouter;

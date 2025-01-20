@@ -1,25 +1,16 @@
-// All the user routes
 const express = require('express');
-const router = express.Router();
-const verifyToken = require('../middleware/auth/verifyToken');
+const userRouter = express.Router();
+const { requireAuth } = require('@clerk/clerk-sdk-node');
+const checkObjectID = require('../middleware/main/checkObjectID');
 
-// Import Controller 
-const { getUserById } = require('../controllers/user/getUserById');
-const { deleteUser } = require('../controllers/user/deleteUser');
-const { followUnfollowUser } = require('../controllers/user/followOrUnfollowUser');
-const { getFollowers } = require('../controllers/user/getFollowerList');
-const { getFollowing } = require('../controllers/user/getFollowingList');
-const { updateUserProfile } = require('../controllers/user/updateUser')
+userRouter.use(requireAuth); // Protect all user routes with Clerk
+userRouter.use(checkObjectID);
 
-// Routes for Users
-router.get('/:id', verifyToken, getUserById); // Get User by Id
-router.delete('/:id', verifyToken, deleteUser); // Delete User
-router.post('/:id/follow-unfollow', verifyToken, followUnfollowUser) // Follow or Unfllow a User
-router.get('/:id/followers', verifyToken, getFollowers) // Get User's Follwers List
-router.get('/:id/following', verifyToken, getFollowing) // Get User's Following List
-router.patch('/:id', verifyToken, updateUserProfile) // Update User's Profile
+userRouter.get('/:id', require('../controllers/user/getUserById')); // Get User by Id
+userRouter.delete('/:id', require('../controllers/user/deleteUser')); // Delete User
+userRouter.post('/:id/follow-unfollow', require('../controllers/user/followOrUnfollowUser')); // Follow or Unfollow a User
+userRouter.get('/:id/followers', require('../controllers/user/getFollowerList')); // Get User's Followers List
+userRouter.get('/:id/following', require('../controllers/user/getFollowingList')); // Get User's Following List
+userRouter.patch('/:id', require('../controllers/user/updateUser')); // Update User's Profile
 
-
-module.exports = router;
-
-
+module.exports = userRouter;
