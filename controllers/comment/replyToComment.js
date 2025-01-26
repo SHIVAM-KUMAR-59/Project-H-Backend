@@ -1,19 +1,33 @@
-// Reply to a comment
 const Comment = require('../../models/Comment')
+const User = require('../../models/User')
 
-async function replyToComment(req, res) {
-    let comment = await Comment.findById(req.params.id)
-    if (!comment) return res.status(404).json({ message: "Comment Not Found" })
-    let replyData = {
-        content: req.body.content,
-        authorId: req.user.userId,
-        postID: comment.postId,
-        parentComment: comment._id,
-    }
-    const reply = await Comment.create(replyData);
-    comment.replies.push(reply._id)
-    await comment.save()
-    return res.status(200).json({ message: "Comment Reply Added Successfully", reply })
+// Reply to a comment
+const replyToComment = async (req, res) => {
+  const { id } = req.params
+  const { content } = req.body
+  if (!content) {
+    return res.status(400).json({ message: 'Please enter a comment' })
+  }
+  const comment = await Comment.findById(id)
+  if (!comment) {
+    return res.status(404).json({ message: 'Comment not found' })
+  }
+  const user = await User.findOne({ clerkId: req.userId })
+  if (!user) {
+    return res.status(404).json({ message: 'User not found' })
+  }
+  const newComment = new Comment({
+    content,
+    authorId: user._id,
+    postId: comment.postId,
+    replies: [],
+  })
+  await newComment.save()
+  comment.replies.push(newComment._id)
+  await comment.save()
+  return res
+    .status(200)
+    .json({ message: 'Comment added successfully', data: newComment })
 }
 
-module.exports = replyToComment;
+module.exports = replyToComment

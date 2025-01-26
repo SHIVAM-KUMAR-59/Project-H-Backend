@@ -1,5 +1,5 @@
 const Post = require('../../models/Post') // Adjust the path as needed
-
+const Comment = require('../../models/Comment')
 // Controller to get a post by ID
 const getPostById = async (req, res) => {
   try {
@@ -15,11 +15,29 @@ const getPostById = async (req, res) => {
 
     // Find the post by ID and populate user data
     const post = await Post.findById(id)
-      .populate({
-        path: 'author',
-        select: 'username', // Select only the username field of the author
-      })
-      .select('author') // Select only the author field of the post
+      .populate([
+        {
+          path: 'author',
+          select: 'username', // Select only the username field of the author
+        },
+        {
+          path: 'comments', // Populate the comments field
+          populate: [
+            {
+              path: 'authorId',
+              select: 'username', // Populate the author of the comment
+            },
+            {
+              path: 'replies', // Populate the replies field (array of Comment references)
+              populate: {
+                path: 'authorId', // Populate the author of each reply
+                select: 'username', // Select the username field of reply authors
+              },
+            },
+          ],
+        },
+      ])
+      .select('author comments')
 
     // Check if post exists
     if (!post) {
