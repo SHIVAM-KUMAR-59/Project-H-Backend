@@ -8,6 +8,7 @@ const bodyParser = require('body-parser')
 const { connectDB } = require('./config/configDB')
 const logger = require('./utils/main/logger')
 const apiRoutes = require('./routes/api')
+const storyRouter = require('./routes/story')
 const { webhookHandler } = require('./middleware/clerk/webhook')
 const { verifyClerkToken } = require('./middleware/clerk/verifyToken')
 
@@ -46,15 +47,39 @@ app.use(cors({
 app.use(limiter)
 
 // Request Body Middleware
-app.use(express.urlencoded({ extended: false }))
-app.use(express.json())
-app.use(bodyParser.json())
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+app.use(express.json({ limit: '50mb' }))
+app.use(bodyParser.json({ limit: '50mb' }))
 
 // Logging Middleware
 app.use(logger) // Logging Requests To Access Log
 
 // Images Middleware
 app.use(express.static(path.resolve('./public')))
+
+// Log all API requests for debugging
+app.use((req, res, next) => {
+  if (req.method === 'POST' && req.path.includes('/stories')) {
+    console.log('📝 Story request body keys:', Object.keys(req.body));
+    
+    // Enhanced logging for story creation
+    if (req.path.includes('/create')) {
+      if (req.body.image && typeof req.body.image === 'string') {
+        console.log('📝 Image data type:', typeof req.body.image);
+        console.log('📝 Image data prefix:', req.body.image.substring(0, 30) + '...');
+      } else {
+        console.log('📝 Image data missing or not a string');
+      }
+      
+      if (req.body.userId) {
+        console.log('📝 User ID in request:', req.body.userId);
+      } else {
+        console.log('📝 User ID missing in request');
+      }
+    }
+  }
+  next();
+})
 
 const PORT = process.env.PORT || 5001
 
@@ -63,6 +88,9 @@ connectDB()
 
 // Mount API routes under /api
 app.use('/api', apiRoutes)
+
+// Mount story routes directly under /api/stories
+app.use('/api/stories', storyRouter)
 
 // Route to check the user profile
 app.get('/api/profile', verifyClerkToken, (req, res) => {
