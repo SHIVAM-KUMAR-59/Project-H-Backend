@@ -50,8 +50,13 @@ const limiter = rateLimit({
 app.use(helmet())
 app.use(cors({
   origin: [
+    'http://localhost:19006', 
+    'http://localhost:19001', 
     'http://localhost:19000', 
-    'http://localhost:19001',
+    'http://localhost:5001',
+    'http://localhost:3000',
+    'http://10.0.2.2:8081', 
+    'http://10.0.2.2:5001', 
     'http://10.0.2.2:19000', 
     'http://10.0.2.2:19001',
     'http://192.168.1.7:8081',
@@ -65,7 +70,15 @@ app.use(cors({
     'http://192.168.1.40:19000',
     'exp://192.168.1.40:19000',
     'http://192.168.1.40:19001',
-    'exp://192.168.1.40:19001'
+    'exp://192.168.1.40:19001',
+    'http://192.168.1.13:5001',
+    'exp://192.168.1.13:5001',
+    'http://192.168.1.13:19000',
+    'exp://192.168.1.13:19000',
+    'http://192.168.1.13:19001',
+    'exp://192.168.1.13:19001',
+    'http://192.168.1.13:8081',
+    'exp://192.168.1.13:8081'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],

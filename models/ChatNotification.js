@@ -18,6 +18,11 @@ const ChatNotificationSchema = new mongoose.Schema(
         'removed_from_group',
         'admin_promotion',
         'admin_demotion',
+        'group_updated',
+        'group_members_added',
+        'group_removed',
+        'group_member_left',
+        'group_role_changed'
       ],
       required: true,
     },

@@ -274,18 +274,31 @@ const getAllChats = async (req, res) => {
     
     // Format group chats
     const formattedGroupChats = groupChats.map(group => {
+      // Log to debug the members
+      console.log(`📊 Processing group ${group.name} with ${group.members.length} members`);
+      group.members.forEach(member => {
+        console.log(`- Member: ${member.user.username} (${member.user._id}), Role: ${member.role}`);
+      });
+
       return {
         _id: group._id,
         type: 'group',
         name: group.name,
         description: group.description,
-        avatar: null, // Groups don't have avatars yet
+        avatar: group.avatar || null,
         participants: group.members.map(member => ({
           _id: member.user._id,
           username: member.user.username,
           profileImg: member.user.profileImg,
           role: member.role
         })),
+        members: group.members.map(member => ({
+          _id: member.user._id,
+          username: member.user.username,
+          profileImg: member.user.profileImg,
+          role: member.role
+        })),
+        memberCount: group.members.length,
         lastMessage: group.lastMessage,
         createdAt: group.createdAt
       };
