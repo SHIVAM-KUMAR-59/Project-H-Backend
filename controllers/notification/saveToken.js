@@ -3,17 +3,33 @@ const User = require('../../models/User')
 const saveToken = async (req, res) => {
   try {
     const { pushNotificationToken } = req.body
+    const { mongoUserId } = req.query
 
     if (!pushNotificationToken) {
       return res.status(400).json({
         success: false,
-        message: 'User ID and Expo Notification Token are required.',
+        message: 'Expo Notification Token is required.',
+      })
+    }
+
+    // Determine user ID from either authenticated user or query parameter
+    let userId = req.user?._id
+    
+    // If no authenticated user but mongoUserId is provided in query params
+    if (!userId && mongoUserId) {
+      userId = mongoUserId
+    }
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required. Either authenticate or provide mongoUserId.',
       })
     }
 
     // Find user and update their pushNotificationToken
     const user = await User.findByIdAndUpdate(
-      req.user._id,
+      userId,
       { pushNotificationToken },
       { new: true },
     )

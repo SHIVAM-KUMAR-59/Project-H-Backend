@@ -211,12 +211,20 @@ function setupSocketServer(server) {
           text,
           chatType: 'private',
           participants: [userId, recipientId],
-          attachments: attachments.map(att => ({
-            type: att.type,
-            url: att.url,
-            name: att.name,
-            size: att.size
-          })),
+          attachments: attachments.map(att => {
+            // Log the attachment URLs to debug
+            if (att.url) {
+              console.log(`SOCKET DEBUG: Original private message URL: ${att.url}`);
+            }
+            
+            // Don't modify the URL - keep the original URL
+            return {
+              type: att.type,
+              url: att.url, // Keep the original URL without modification
+              name: att.name,
+              size: att.size
+            };
+          }),
           readBy: [{ user: userId, readAt: new Date() }]
         });
         
@@ -392,12 +400,20 @@ function setupSocketServer(server) {
           text,
           chatType: 'group',
           participants: memberIds,
-          attachments: attachments.map(att => ({
-            type: att.type,
-            url: att.url,
-            name: att.name,
-            size: att.size
-          })),
+          attachments: attachments.map(att => {
+            // Log the attachment URLs to debug
+            if (att.url) {
+              console.log(`SOCKET DEBUG: Original attachment URL: ${att.url}`);
+            }
+            
+            // Don't modify the URL - keep the original URL
+            return {
+              type: att.type,
+              url: att.url, // Keep the original URL without modification
+              name: att.name,
+              size: att.size
+            };
+          }),
           readBy: [{ user: userId, readAt: new Date() }]
         });
         

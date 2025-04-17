@@ -5,17 +5,55 @@ const ChatGroup = require('../../models/ChatGroup');
 const ChatNotification = require('../../models/ChatNotification');
 
 /**
+ * Fix attachment URLs by removing client-side properties but keeping the original URL
+ */
+const fixAttachmentUrls = (attachments = []) => {
+  // If no attachments or empty array, return as is
+  if (!attachments || !Array.isArray(attachments) || attachments.length === 0) {
+    return attachments;
+  }
+  
+  return attachments.map(att => {
+    // Skip if no URL or it's not a string
+    if (!att.url || typeof att.url !== 'string') {
+      return att;
+    }
+    
+    // Debug log to verify the URL is preserved
+    console.log(`📎 IMPORTANT DEBUG: Original URL before processing: ${att.url}`);
+    
+    // ENSURE we are not modifying the URL - absolutely no IP address replacement
+    
+    // Debug log after (should be identical to before)
+    console.log(`📎 IMPORTANT DEBUG: Final URL after processing: ${att.url}`);
+    
+    return {
+      ...att,
+      url: att.url // Keep the exact original URL
+    };
+  });
+};
+
+/**
  * Send a message in a chat (private or group)
  */
 const sendMessage = async (req, res) => {
   try {
     console.log('💬 Sending message');
-    const { chatId, chatType, text, attachments = [] } = req.body;
+    const { chatId, chatType, text = '', attachments = [] } = req.body;
     
-    if (!chatId || !chatType || !text) {
+    if (!chatId || !chatType) {
       return res.status(400).json({
         success: false,
-        message: 'Chat ID, chat type, and message text are required'
+        message: 'Chat ID and chat type are required'
+      });
+    }
+    
+    // Check if message has either text or attachments
+    if (!text && (!attachments || attachments.length === 0)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message must contain either text or attachments'
       });
     }
     
@@ -81,7 +119,7 @@ const sendMessage = async (req, res) => {
         text,
         chatType: 'private',
         participants: chat.participants,
-        attachments: attachments.map(att => ({
+        attachments: fixAttachmentUrls(attachments).map(att => ({
           type: att.type,
           url: att.url,
           name: att.name,
@@ -176,7 +214,7 @@ const sendMessage = async (req, res) => {
         text,
         chatType: 'group',
         participants: memberIds,
-        attachments: attachments.map(att => ({
+        attachments: fixAttachmentUrls(attachments).map(att => ({
           type: att.type,
           url: att.url,
           name: att.name,

@@ -6,16 +6,22 @@ const User = require('../../models/User')
  */
 const getHomeFeed = async (req, res) => {
   try {
-    const { id: userId } = req.params
+    // Get userId from request params
+    const { id: userId } = req.params 
+    console.log('🔍 Feed requested for MongoDB user ID:', userId);
+
+    // Verify MongoDB ID format first
+    if (!userId || !userId.match(/^[0-9a-fA-F]{24}$/)) {
+      console.error('❌ Invalid MongoDB user ID format:', userId);
+      return res.status(400).json({ 
+        error: 'Invalid user ID format',
+        details: 'The provided ID does not appear to be a valid MongoDB ObjectId'
+      });
+    }
+
+    // Extract pagination parameters
     const { page = 1, limit = 20 } = req.query
     const pageLimit = parseInt(limit)
-
-    console.log('🔍 Fetching feed for user:', userId)
-
-    // Validate MongoDB ObjectId format
-    if (!userId.match(/^[0-9a-fA-F]{24}$/)) {
-      return res.status(400).json({ error: 'Invalid user ID format' })
-    }
 
     const user = await User.findById(userId).lean()
     if (!user) {
@@ -25,7 +31,20 @@ const getHomeFeed = async (req, res) => {
     console.log('✅ User found:', user.username)
 
     const { following, preferences, likedPosts } = user
-    const isNewUser = !following?.length && !likedPosts?.length
+    
+    console.log('📊 User metrics:', {
+      followingCount: following?.length || 0,
+      preferencesCount: preferences?.length || 0,
+      likedPostsCount: likedPosts?.length || 0
+    });
+
+    // For new users without much data, we'll need to show trending/recommended content
+    const isNewUser = (!following || following.length === 0) && 
+                      (!likedPosts || likedPosts.length === 0);
+    
+    if (isNewUser) {
+      console.log('ℹ️ New user detected - showing trending content only');
+    }
 
     let preferredPosts = []
     let followingPosts = []
@@ -39,7 +58,8 @@ const getHomeFeed = async (req, res) => {
         .populate('comments')
         .sort({ createdAt: -1 })
         .limit(pageLimit)
-        .lean()
+        .lean();
+      console.log(`✅ Found ${preferredPosts.length} posts matching user preferences`);
     }
 
     // Fetch posts from followed users
@@ -49,7 +69,8 @@ const getHomeFeed = async (req, res) => {
         .populate('comments')
         .sort({ createdAt: -1 })
         .limit(pageLimit)
-        .lean()
+        .lean();
+      console.log(`✅ Found ${followingPosts.length} posts from followed users`);
     }
 
     // Fetch trending posts
@@ -58,7 +79,8 @@ const getHomeFeed = async (req, res) => {
       .populate('comments')
       .sort({ likes: -1, createdAt: -1 })
       .limit(pageLimit)
-      .lean()
+      .lean();
+    console.log(`✅ Found ${trendingPosts.length} trending posts`);
 
     // Fetch posts with matching tags from liked posts
     if (likedPosts?.length) {
@@ -73,7 +95,8 @@ const getHomeFeed = async (req, res) => {
           .populate('comments')
           .sort({ createdAt: -1 })
           .limit(pageLimit)
-          .lean()
+          .lean();
+        console.log(`✅ Found ${tagMatchedPosts.length} posts with matching tags`);
       }
     }
 
@@ -95,23 +118,43 @@ const getHomeFeed = async (req, res) => {
     })
 
     // Avoid consecutive posts from the same author
-    let finalFeed = []
-    let authorLastPost = new Map()
-
+    let finalFeed = [];
+    let authorLastPost = new Map();
+    
+    // For new users, prioritize diversity of content
     for (let post of sortedPosts) {
-      if (!post.author?._id) continue
-
+      // Only include posts with an author property
+      if (!post.author || !post.author._id) continue;
+      
+      // Check for duplicate authors (don't show sequential posts by same author)
       if (
         !authorLastPost.has(post.author._id.toString()) ||
         finalFeed.length - authorLastPost.get(post.author._id.toString()) > 3
       ) {
-        finalFeed.push(post)
-        authorLastPost.set(post.author._id.toString(), finalFeed.length - 1)
+        finalFeed.push(post);
+        authorLastPost.set(post.author._id.toString(), finalFeed.length - 1);
       }
     }
 
-    console.log(`✅ Returning ${finalFeed.length} posts in home feed.`)
-    res.status(200).json({ feed: finalFeed, currentPage: page })
+    // If we still don't have enough posts, add any remaining posts
+    if (finalFeed.length < 5 && sortedPosts.length > finalFeed.length) {
+      for (let post of sortedPosts) {
+        if (!finalFeed.some(p => p._id.toString() === post._id.toString())) {
+          finalFeed.push(post);
+          if (finalFeed.length >= pageLimit) break;
+        }
+      }
+    }
+
+    res.status(200).json({ 
+      feed: finalFeed, 
+      currentPage: page,
+      meta: {
+        userId: user._id,
+        postCount: finalFeed.length,
+        isNewUser: isNewUser
+      }
+    });
   } catch (error) {
     console.error('❌ Error fetching home feed:', error)
     res.status(500).json({ error: 'Internal server error' })
@@ -139,26 +182,47 @@ const getExploreFeed = async (req, res) => {
     }
 
     const { likedPosts, preferences } = user
-    let likedTags = new Set()
 
-    if (likedPosts?.length) {
+    // For new users without much data, we'll need to show trending/recommended content
+    const isNewUser = (!user.following || user.following.length === 0) && 
+                      (!likedPosts || likedPosts.length === 0);
+    
+    console.log('📊 User profile:', {
+      username: user.username,
+      isNewUser: isNewUser,
+      likedPostsCount: likedPosts?.length || 0,
+      preferencesCount: preferences?.length || 0
+    });
+
+    // Get liked post tags
+    let likedTags = new Set()
+    if (likedPosts && likedPosts.length > 0) {
       const likedPostData = await Post.find({ _id: { $in: likedPosts } }).lean()
-      likedPostData.forEach((post) =>
-        post.tags?.forEach((tag) => likedTags.add(tag)),
-      )
+      likedPostData.forEach((post) => {
+        if (post.tags && Array.isArray(post.tags)) {
+          post.tags.forEach((tag) => likedTags.add(tag))
+        }
+      })
     }
 
     // Fetch posts based on engagement (likes, category, preferences)
-    let posts = await Post.find({
-      $or: [
-        { tags: { $in: [...likedTags] } },
-        { category: { $in: preferences } },
-      ],
-    })
-      .populate('author', 'username profileImg')
-      .populate('comments')
-      .sort({ likes: -1, comments: -1, createdAt: -1 })
-      .lean()
+    let posts = []
+    
+    // If user has tags or preferences, use them for personalization
+    if (likedTags.size > 0 || (preferences && preferences.length > 0)) {
+      posts = await Post.find({
+        $or: [
+          { tags: { $in: Array.from(likedTags) } },
+          { category: { $in: preferences } },
+        ],
+      })
+        .populate('author', 'username profileImg')
+        .populate('comments')
+        .sort({ likes: -1, comments: -1, createdAt: -1 })
+        .lean()
+      
+      console.log(`✅ Found ${posts.length} personalized posts based on preferences/tags`);
+    }
 
     let finalFeed = []
     let authorLastPost = new Map()
@@ -171,17 +235,74 @@ const getExploreFeed = async (req, res) => {
         finalFeed.length - authorLastPost.get(post.author._id.toString()) > 3
       ) {
         finalFeed.push(post)
-        authorLastPost.set(post.author._id.toString(), finalFeed.length - 1)
+        authorLastPost.set(post.author._id, finalFeed.length)
       }
 
       if (finalFeed.length >= pageLimit) break
     }
 
-    console.log(`✅ Returning ${finalFeed.length} posts in explore feed.`)
-    res.status(200).json({ feed: finalFeed.slice(0, pageLimit) })
+    // FALLBACK: If we didn't get enough posts, fetch trending posts with images
+    if (finalFeed.length === 0) {
+      console.log('ℹ️ No personalized posts found, using fallback mechanism');
+      
+      // First try recent posts with images
+      const fallbackPosts = await Post.find({
+        image: { $exists: true, $ne: null, $ne: "" } // Posts with images
+      })
+        .populate('author', 'username profileImg')
+        .populate('comments')
+        .sort({ createdAt: -1 }) // Most recent first
+        .limit(pageLimit)
+        .lean();
+      
+      console.log(`✅ Found ${fallbackPosts.length} fallback posts with images`);
+      
+      // If we still don't have posts, get any posts
+      if (fallbackPosts.length === 0) {
+        const anyPosts = await Post.find({})
+          .populate('author', 'username profileImg')
+          .populate('comments')
+          .sort({ createdAt: -1 })
+          .limit(pageLimit)
+          .lean();
+        
+        console.log(`✅ Found ${anyPosts.length} general posts as final fallback`);
+        finalFeed = anyPosts;
+      } else {
+        finalFeed = fallbackPosts;
+      }
+      
+      // Return feed with fallback flag
+      console.log(`✅ Returning ${finalFeed.length} fallback posts in the feed`);
+      return res.status(200).json({ 
+        feed: finalFeed.slice(0, pageLimit),
+        currentPage: page,
+        meta: {
+          userId: user._id,
+          postCount: finalFeed.length,
+          isNewUser: isNewUser,
+          isFallback: true // Add fallback flag
+        }
+      });
+    }
+
+    console.log(`✅ Returning ${finalFeed.length} personalized posts in the feed`);
+    res.status(200).json({ 
+      feed: finalFeed.slice(0, pageLimit),
+      currentPage: page,
+      meta: {
+        userId: user._id,
+        postCount: finalFeed.length,
+        isNewUser: isNewUser,
+        isFallback: false
+      }
+    });
   } catch (error) {
-    console.error('❌ Error fetching explore feed:', error)
-    res.status(500).json({ error: 'Internal server error' })
+    console.error('❌ Error fetching explore feed:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      message: error.message 
+    });
   }
 }
 

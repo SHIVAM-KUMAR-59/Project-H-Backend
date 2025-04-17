@@ -1,11 +1,8 @@
 const Notification = require('../../models/Notification')
 const mongoose = require('mongoose')
 
-// Mark notifications as read
-const markAsRead = async (req, res) => {
+const getUnreadCount = async (req, res) => {
   try {
-    const { notificationIds } = req.body
-    
     // Get the user ID from the request
     // First check if it came from auth middleware
     let userId = req.user?._id
@@ -24,36 +21,37 @@ const markAsRead = async (req, res) => {
       }
     }
     
-    // Validate required data
-    if (!userId || !notificationIds || !notificationIds.length) {
-      console.log('❌ Missing required data for marking notifications')
-      return res.status(400).json({ 
+    // If still no userId, return error
+    if (!userId) {
+      console.log('❌ No user ID available')
+      return res.status(400).json({
         success: false,
-        message: 'Invalid request data.'
+        message: 'No user ID provided'
       })
     }
 
-    console.log('📝 Marking notifications as read:', notificationIds)
+    console.log('🔍 Counting unread notifications for user:', userId)
     
-    // Update using receiverId field (not userId which is the sender)
-    await Notification.updateMany(
-      { receiverId: userId, _id: { $in: notificationIds } },
-      { isRead: true },
-    )
+    const unreadCount = await Notification.countDocuments({ 
+      receiverId: userId, 
+      isRead: false 
+    })
 
-    console.log('✅ Notifications marked as read')
+    console.log('✅ Found unread notifications:', unreadCount)
     
     return res.status(200).json({
       success: true,
-      message: 'Notifications marked as read',
+      data: {
+        unreadCount
+      }
     })
   } catch (error) {
-    console.error('❌ Error marking notifications:', error)
+    console.error('❌ Error fetching unread notifications count:', error)
     return res.status(500).json({ 
       success: false,
-      message: 'Internal server error'
+      message: 'Internal server error' 
     })
   }
 }
 
-module.exports = markAsRead
+module.exports = getUnreadCount 

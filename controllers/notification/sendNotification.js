@@ -9,6 +9,7 @@ const expo = new Expo()
 const sendNotification = async (req, res) => {
   try {
     const { title, message, type } = req.body
+    const { mongoUserId } = req.query
 
     // Validate input
     if (!title || !message || !type) {
@@ -17,8 +18,23 @@ const sendNotification = async (req, res) => {
         .json({ success: false, message: 'Missing required fields.' })
     }
 
+    // Determine user ID from either authenticated user or query parameter
+    let userId = req.user?._id
+    
+    // If no authenticated user but mongoUserId is provided in query params
+    if (!userId && mongoUserId) {
+      userId = mongoUserId
+    }
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required. Either authenticate or provide mongoUserId.',
+      })
+    }
+
     // Fetch user with selected fields only
-    const user = await User.findById(req.user._id)
+    const user = await User.findById(userId)
       .select('pushNotificationToken')
       .lean()
     if (!user?.pushNotificationToken) {
@@ -50,7 +66,8 @@ const sendNotification = async (req, res) => {
 
     // Save notification in DB asynchronously
     const notificationPromise = Notification.create({
-      userId: user._id,
+      userId,
+      receiverId: userId, // Set the receiver to the target user
       type,
       title,
       message,

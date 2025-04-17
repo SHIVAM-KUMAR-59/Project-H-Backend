@@ -50,8 +50,13 @@ const limiter = rateLimit({
 app.use(helmet())
 app.use(cors({
   origin: [
+    'http://localhost:19006', 
+    'http://localhost:19001', 
     'http://localhost:19000', 
-    'http://localhost:19001',
+    'http://localhost:5001',
+    'http://localhost:3000',
+    'http://10.0.2.2:8081', 
+    'http://10.0.2.2:5001', 
     'http://10.0.2.2:19000', 
     'http://10.0.2.2:19001',
     'http://192.168.1.7:8081',
@@ -65,7 +70,15 @@ app.use(cors({
     'http://192.168.1.40:19000',
     'exp://192.168.1.40:19000',
     'http://192.168.1.40:19001',
-    'exp://192.168.1.40:19001'
+    'exp://192.168.1.40:19001',
+    'http://192.168.1.13:5001',
+    'exp://192.168.1.13:5001',
+    'http://192.168.1.13:19000',
+    'exp://192.168.1.13:19000',
+    'http://192.168.1.13:19001',
+    'exp://192.168.1.13:19001',
+    'http://192.168.1.13:8081',
+    'exp://192.168.1.13:8081'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -122,6 +135,9 @@ connectDB()
 // Mount API routes under /api
 app.use('/api', apiRoutes)
 
+// BACKUP ROUTE: Add direct access to public notifications without /api prefix
+app.use('/public-notifications', require('./routes/publicNotifications'))
+
 // Mount story routes directly under /api/stories
 app.use('/api/stories', storyRouter)
 
@@ -151,15 +167,158 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Health check endpoint for notifications (no auth required)
+app.get('/api/notifications-health', (req, res) => {
+  res.set('Content-Type', 'application/json');
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    routes: {
+      notifications: '/api/notifications',
+      notificationsUnread: '/api/notifications/unread', 
+      publicNotifications: '/api/public-notifications',
+      publicNotificationsUnread: '/api/public-notifications/unread',
+      directPublic: '/public-notifications',
+      directPublicUnread: '/public-notifications/unread'
+    },
+    notificationModelsLoaded: !!require('./models/Notification'),
+    controllersLoaded: {
+      getNotifications: !!require('./controllers/notification/getNotifications'),
+      getUnreadCount: !!require('./controllers/notification/getUnreadCount')
+    }
+  });
+});
+
 // Clerk Webhook endpoint (only apply webhook handler here)
 app.post('/api/webhook', webhookHandler)
 
+// Special debug routes for notifications
+app.get('/debug-notifications', async (req, res) => {
+  console.log('🟢 DEBUG: Direct access to /debug-notifications');
+  console.log('   Query:', req.query);
+  
+  const { mongoUserId } = req.query;
+  if (!mongoUserId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing mongoUserId parameter'
+    });
+  }
+  
+  try {
+    const Notification = require('./models/Notification');
+    const notifications = await Notification.find({ receiverId: mongoUserId })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
+    return res.status(200).json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error('Error in debug notifications:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching notifications',
+      error: error.message
+    });
+  }
+});
+
+// RESTful debug route for notifications 
+app.get('/api/user-notifications/:userId', async (req, res) => {
+  console.log('🟢 DEBUG: RESTful access to /api/user-notifications/:userId');
+  console.log('   Params:', req.params);
+  
+  const { userId } = req.params;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing user ID parameter'
+    });
+  }
+  
+  try {
+    const Notification = require('./models/Notification');
+    const notifications = await Notification.find({ receiverId: userId })
+      .populate('userId', '_id username profileImage')
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+    
+    return res.status(200).json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error('Error in RESTful notifications:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching notifications',
+      error: error.message
+    });
+  }
+});
+
+// RESTful route for unread notifications count
+app.get('/api/user-notifications/:userId/unread', async (req, res) => {
+  console.log('🟢 DEBUG: RESTful access to /api/user-notifications/:userId/unread');
+  console.log('   Params:', req.params);
+  
+  const { userId } = req.params;
+  if (!userId) {
+    return res.status(400).json({
+      success: false,
+      message: 'Missing user ID parameter'
+    });
+  }
+  
+  try {
+    const Notification = require('./models/Notification');
+    const unreadCount = await Notification.countDocuments({ 
+      receiverId: userId,
+      isRead: false
+    });
+    
+    return res.status(200).json({
+      success: true,
+      data: {
+        unreadCount
+      }
+    });
+  } catch (error) {
+    console.error('Error in RESTful unread count:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching unread notification count',
+      error: error.message
+    });
+  }
+});
+
 // 404 handler
 app.all('*', (req, res) => {
-  console.log('❌ 404 Not Found:', req.originalUrl);
+  console.log('❌ 404 Not Found:', {
+    url: req.originalUrl,
+    method: req.method,
+    query: req.query,
+    headers: {
+      contentType: req.headers['content-type'],
+      authorization: req.headers.authorization ? 'Bearer ...' : undefined
+    }
+  });
   res
     .status(404)
-    .json({ message: `${req.originalUrl} is not found on this server` })
+    .json({ 
+      message: `${req.originalUrl} is not found on this server`,
+      availableEndpoints: [
+        '/api/notifications',
+        '/api/notifications/unread',
+        '/api/public-notifications',
+        '/api/public-notifications/unread'
+      ]
+    })
 })
 
 // Create HTTP server
